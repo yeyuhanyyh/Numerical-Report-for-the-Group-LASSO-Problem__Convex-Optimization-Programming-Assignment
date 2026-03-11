@@ -65,7 +65,7 @@ A major reason this problem is well suited for first-order methods is that the s
 The nonsmooth part is separable row by row, and its proximal operator is the row-wise group soft-thresholding map:
 
 ```math
-\operatorname{prox}_{\tau g}(V)_{i,:}
+prox_{\tau g}(V)_{i,:}
 =
 \max\left(1-\frac{\tau \mu}{\|V_{i,:}\|_2},\,0\right)V_{i,:}.
 ```
