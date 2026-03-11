@@ -2,133 +2,282 @@
 
 Course Project for Optimization Methods (Peking University)
 
-This repository contains MATLAB implementations and numerical experiments for the Group LASSO problem. The project compares multiple optimization methods, including commercial solver baselines, first-order primal methods, and augmented Lagrangian / ADMM-based algorithms.
+This repository contains MATLAB implementations and numerical experiments for solving the **Group LASSO** problem using several optimization methods, including solver-based baselines, first-order methods, and augmented Lagrangian / ADMM-based algorithms.
 
 ## Project Overview
 
-We study the matrix-valued Group LASSO problem
+The main goal of this project is to study and compare different numerical methods for solving the matrix-valued Group LASSO problem. In this model, the unknown variable is a matrix, and the regularization term is designed to promote **row-wise sparsity**. In other words, entire rows of the solution matrix are encouraged to become zero together, which is the key feature of group sparsity.
+
+This repository includes:
+
+- benchmark solutions obtained by professional optimization solvers,
+- custom implementations of gradient-based and proximal algorithms,
+- dual and primal splitting methods such as ALM and ADMM,
+- a reproducible MATLAB script for generating synthetic test data and comparing methods,
+- a written report containing derivations and numerical discussion.
+
+## Mathematical Formulation
+
+We solve the following optimization problem:
 
 ```math
 \min_{X \in \mathbb{R}^{n \times l}}
-\frac{1}{2}\|AX-b\|_F^2 + \mu \sum_{i=1}^{n}\|X_{i,:}\|_2.
+\; F(X)
+:=
+\frac{1}{2}\|AX-b\|_F^2
++
+\mu \sum_{i=1}^{n}\|X_{i,:}\|_2.
 ```
 
-Here
+Here:
 
 - $A \in \mathbb{R}^{m \times n}$ is the data matrix,
 - $X \in \mathbb{R}^{n \times l}$ is the optimization variable,
 - $b \in \mathbb{R}^{m \times l}$ is the observation matrix,
-- $\mu > 0$ is the regularization parameter.
+- $\mu > 0$ is the regularization parameter,
+- $X_{i,:}$ denotes the $i$-th row of $X$,
+- $\|\cdot\|_F$ is the Frobenius norm.
 
-The row-wise $\ell_2$ regularization promotes **group sparsity**, meaning that entire rows of $X$ are encouraged to become zero together.
+The objective consists of two parts:
 
-The goal of this project is to solve the same optimization problem using different numerical methods and compare them in terms of runtime, convergence behavior, objective value, and sparsity recovery.
+```math
+f(X) = \frac{1}{2}\|AX-b\|_F^2,
+\qquad
+g(X) = \mu \sum_{i=1}^{n}\|X_{i,:}\|_2.
+```
+
+So the problem can be written compactly as
+
+```math
+\min_X \; f(X) + g(X).
+```
+
+The first term is a least-squares data-fitting term, while the second term is a row-wise $\ell_{2,1}$ regularizer. This regularizer encourages the solution to be sparse at the **group level**, meaning that many rows of $X$ become exactly zero.
+
+## Gradient and Proximal Structure
+
+A major reason this problem is well suited for first-order methods is that the smooth part has a simple gradient:
+
+```math
+\nabla f(X) = A^\top(AX-b).
+```
+
+The nonsmooth part is separable row by row, and its proximal operator is the row-wise group soft-thresholding map:
+
+```math
+\operatorname{prox}_{\tau g}(V)_{i,:}
+=
+\max\left(1-\frac{\tau \mu}{\|V_{i,:}\|_2},\,0\right)V_{i,:}.
+```
+
+This formula is the basis of the proximal gradient and accelerated proximal gradient solvers implemented in this repository.
+
+## Splitting Formulation
+
+For ALM and ADMM-type methods, it is convenient to introduce an auxiliary variable and rewrite the problem as
+
+```math
+\min_{X,Y}
+\frac{1}{2}\|AX-b\|_F^2
++
+\mu \sum_{i=1}^{n}\|Y_{i,:}\|_2
+\quad
+\text{s.t. }
+X-Y=0.
+```
+
+This equivalent constrained formulation separates the smooth least-squares term from the nonsmooth group regularization term, making it natural to apply augmented Lagrangian and alternating minimization techniques.
 
 ## Implemented Methods
 
-### Reference / Solver-Based Baselines
+This repository includes the following categories of methods.
+
+### 1. Solver-Based Baselines
+
+These methods use professional optimization solvers and provide high-quality reference solutions.
 
 - `gl_cvx_mosek.m`
 - `gl_cvx_gurobi.m`
 - `gl_mosek.m`
 - `gl_gurobi.m`
 
-These solvers provide reference-quality solutions and useful baselines for comparison.
+These are useful for checking correctness and benchmarking the custom implementations.
 
-### First-Order Primal Methods
+### 2. First-Order Primal Methods
 
-- `gl_SGD_primal.m`
-- `gl_GD_primal.m`
-- `gl_ProxGD_primal.m`
-- `gl_FProxGD_primal.m`
+These methods work directly on the primal problem.
 
-These methods are implemented directly in MATLAB and are useful for studying algorithmic behavior on structured nonsmooth optimization problems.
+- `gl_SGD_primal.m` — subgradient descent
+- `gl_GD_primal.m` — smoothed gradient descent
+- `gl_ProxGD_primal.m` — proximal gradient descent
+- `gl_FProxGD_primal.m` — accelerated proximal gradient descent
 
-### Augmented Lagrangian / Splitting Methods
+These algorithms are lightweight, easy to interpret, and well suited for comparing different optimization ideas on the same problem.
+
+### 3. Dual / Splitting / Augmented Lagrangian Methods
+
+These methods solve reformulated versions of the problem.
 
 - `gl_ALM_dual.m`
 - `gl_ADMM_dual.m`
 - `gl_ADMM_primal.m`
 
-These methods reformulate the Group LASSO problem and solve it through splitting or augmented Lagrangian updates.
+These methods are especially useful for handling the composite structure of the Group LASSO objective.
 
-### Helper Functions
+### 4. Helper Functions
+
+The repository also includes auxiliary routines used by the main solvers.
 
 - `sm_grad.m`
 - `subgrad.m`
 
-These auxiliary routines are used by the gradient-based and subgradient-based methods.
-
 ## Repository Structure
 
+The current repository structure is:
+
 - `code/` — MATLAB source files
-- `code/Test.m` — main script for generating data and running experiments
-- `report.pdf` — written course report
+- `code/Test.m` — main experiment script
+- `report.pdf` — written report for the project
 - `README.md` — repository overview
 
-## Default Experiment
+## Default Experiment Setup
 
-The default experiment in `code/Test.m` generates a synthetic Group LASSO instance and evaluates one solver on it.
+The script `code/Test.m` generates a synthetic Group LASSO instance for testing and comparison.
 
-Current default settings include:
+The current default setup is:
 
-- `n = 512`
-- `m = 256`
-- `l = 2`
-- about 10% active groups in the ground-truth solution
-- `mu = 1e-2`
-- default solver: `gl_ADMM_primal`
+```math
+n = 512, \qquad m = 256, \qquad l = 2.
+```
 
-The script then reports:
+A sparse ground-truth matrix $u \in \mathbb{R}^{n \times l}$ is generated by activating roughly $10\%$ of the rows. The observation matrix is then formed as
 
-- CPU time
-- number of iterations
-- objective value
-- sparsity of the recovered solution
-- relative error to the synthetic ground truth
+```math
+b = Au.
+```
 
-## How to Run
+The default regularization parameter is
 
-1. Open MATLAB and go to the `code/` folder.
-2. Open `Test.m`.
-3. Uncomment the solver you want to test.
-4. Run the script.
+```math
+\mu = 10^{-2}.
+```
 
-For example:
+A random initial point `x0` is used, and the script currently runs
 
 ```matlab
 [x, iter, out] = gl_ADMM_primal(x0, A, b, mu, opts);
 ```
 
-You can replace this line with other solvers in the repository to compare their performance.
+by default.
+
+## Evaluation Metrics
+
+The test script evaluates the computed solution using several quantities.
+
+### Relative error to the synthetic ground truth
+
+```math
+\mathrm{err}(X)
+=
+\frac{\|X-u\|_F}{1+\|u\|_F}.
+```
+
+### Sparsity ratio
+
+The script also reports the empirical sparsity level of the recovered solution by counting entries whose magnitude is non-negligible relative to the largest entry.
+
+### Objective value
+
+The final objective value is
+
+```math
+F(X)
+=
+\frac{1}{2}\|AX-b\|_F^2
++
+\mu \sum_{i=1}^{n}\|X_{i,:}\|_2.
+```
+
+### Runtime and iteration count
+
+The script measures total CPU time and the number of iterations returned by the solver.
+
+## How to Run
+
+1. Open MATLAB.
+2. Change directory to the `code/` folder.
+3. Open `Test.m`.
+4. Uncomment the solver you want to test.
+5. Run the script.
+
+For example, to run the current default configuration:
+
+```matlab
+[x, iter, out] = gl_ADMM_primal(x0, A, b, mu, opts);
+```
+
+To test another method, simply replace that line with one of the other solvers, such as
+
+```matlab
+[x, iter, out] = gl_ProxGD_primal(x0, A, b, mu, opts);
+```
+
+or
+
+```matlab
+[x, iter, out] = gl_ALM_dual(x0, A, b, mu, opts);
+```
+
+## Expected Output
+
+After running `Test.m`, MATLAB prints a summary line in the form
+
+```text
+Result## cputime: ..., iter: ..., optval: ..., sparisity: ..., err-to-exact: ...
+```
+
+This makes it easy to compare different methods in terms of
+
+- computational cost,
+- convergence behavior,
+- final objective value,
+- sparsity recovery,
+- reconstruction accuracy.
 
 ## Dependencies
 
-Some solvers require external optimization software:
+Some methods require external optimization software.
+
+### Solver-based methods
 
 - `gl_cvx_mosek.m` requires CVX with MOSEK
 - `gl_cvx_gurobi.m` requires CVX with Gurobi
-- `gl_mosek.m` requires the MOSEK API
-- `gl_gurobi.m` requires the Gurobi API
+- `gl_mosek.m` requires the MOSEK interface
+- `gl_gurobi.m` requires the Gurobi interface
 
-The first-order and splitting-based MATLAB solvers can be run directly once MATLAB is properly configured.
+### Pure MATLAB methods
 
-## Output and Comparison
+The first-order methods and ADMM / ALM methods can be run directly in MATLAB without external commercial solvers, provided that the MATLAB environment is correctly configured.
 
-This repository is designed not only to compute a solution, but also to support method comparison. By switching solvers in `Test.m`, you can compare:
+## Why This Repository May Be Useful
 
-- solution quality,
-- convergence speed,
-- sparsity recovery,
-- computational cost.
+This repository is helpful in two ways.
 
-This makes the repository suitable as both a coursework submission and a compact reference implementation for the Group LASSO problem.
+First, it serves as a **course project archive** containing code, experiments, and a written report for a convex optimization assignment.
+
+Second, it serves as a **compact comparison platform** for several important optimization paradigms applied to the same structured sparse learning problem, including:
+
+- solver-based conic optimization,
+- subgradient and smoothed gradient methods,
+- proximal methods,
+- augmented Lagrangian methods,
+- ADMM-based splitting methods.
 
 ## Notes
 
-This project was created for educational purposes as part of the Optimization Methods course at Peking University.
+This project was developed for educational purposes as part of the **Optimization Methods** course at Peking University.
 
-For more details on the mathematical formulation, derivations, and numerical discussion, please refer to `report.pdf`.
+For more details on derivations, algorithm design, and numerical results, please refer to `report.pdf`.
 
 ## Author
 
